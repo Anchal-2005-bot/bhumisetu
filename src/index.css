@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-registry-ink: #10233F;
+  --color-survey-paper: #F2F4F0;
+  --color-tilled-earth: #A8672E;
+  --color-cultivated-green: #2F6B3A;
+  --color-alluvium-red: #B4392C;
+  --color-graticule-teal: #5E7B78;
+  
+  --font-serif: "IBM Plex Serif", serif;
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-survey-paper text-registry-ink;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif font-semibold;
+  }
+}
