@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-registry-ink: #10233F;
-  --color-survey-paper: #F2F4F0;
-  --color-tilled-earth: #A8672E;
+  --color-registry-ink: #0B4F47;
+  --color-survey-paper: #F7FAF9;
+  --color-tilled-earth: #0E7C72;
   --color-cultivated-green: #2F6B3A;
   --color-alluvium-red: #B4392C;
-  --color-graticule-teal: #5E7B78;
+  --color-graticule-teal: #7BAEAA;
   
   --font-serif: "IBM Plex Serif", serif;
   --font-sans: "IBM Plex Sans", sans-serif;

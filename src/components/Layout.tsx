@@ -14,7 +14,7 @@ export function Sidebar({ activeTab, setActiveTab }: { activeTab: string, setAct
   ];
 
   return (
-    <aside className="w-64 border-r border-graticule-teal/30 h-[calc(100vh-64px)] overflow-y-auto bg-survey-paper flex flex-col hidden md:flex">
+    <aside className="w-64 border-r border-registry-ink/50 h-[calc(100vh-64px)] overflow-y-auto bg-registry-ink flex flex-col hidden md:flex">
       <nav className="p-4 space-y-1 flex-1">
         {tabs.map((tab) => (
           <button
@@ -22,19 +22,19 @@ export function Sidebar({ activeTab, setActiveTab }: { activeTab: string, setAct
             onClick={() => setActiveTab(tab.id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors rounded-none border-l-2 ${
               activeTab === tab.id
-                ? "border-tilled-earth bg-graticule-teal/10 text-registry-ink font-medium"
-                : "border-transparent text-registry-ink/70 hover:bg-graticule-teal/5 hover:text-registry-ink"
+                ? "border-tilled-earth bg-white/10 text-white font-medium"
+                : "border-transparent text-white/60 hover:bg-white/5 hover:text-white"
             }`}
           >
-            <tab.icon className={`h-4 w-4 ${activeTab === tab.id ? "text-tilled-earth" : "text-graticule-teal"}`} />
+            <tab.icon className={`h-4 w-4 ${activeTab === tab.id ? "text-tilled-earth" : "text-white/50"}`} />
             {tab.label}
           </button>
         ))}
       </nav>
-      <div className="p-4 border-t border-graticule-teal/30">
-        <div className="text-xs text-graticule-teal mb-2 font-mono uppercase tracking-wider">Session Info</div>
-        <div className="text-sm font-medium">District LAO</div>
-        <div className="text-xs text-registry-ink/70">New Delhi, NCT</div>
+      <div className="p-4 border-t border-white/10">
+        <div className="text-xs text-white/40 mb-2 font-mono uppercase tracking-wider">Session Info</div>
+        <div className="text-sm font-medium text-white">District LAO</div>
+        <div className="text-xs text-white/60">New Delhi, NCT</div>
       </div>
     </aside>
   );
