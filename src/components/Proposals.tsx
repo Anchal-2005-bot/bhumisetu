@@ -1,16 +1,34 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Proposal, ProposalAction } from "../types";
-import { useAuth } from "../context/AuthContext";
 import { ProposalDetail } from "./ProposalDetail";
-import { Plus, ArrowLeft, Clock, CheckCircle2, AlertCircle, FileText } from "lucide-react";
-import { motion } from "motion/react";
+import { 
+  Plus, 
+  ArrowLeft, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  FileText, 
+  Check, 
+  X, 
+  ShieldCheck, 
+  ShieldAlert,
+  Info
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { useAuth } from "../context/AuthContext";
 
 export function Proposals() {
-  const { role } = useAuth();
+  const { user, role, canApproveProposal, canSubmitProposal } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [view, setView] = useState<"list" | "create" | "detail">("list");
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [actionFeedback, setActionFeedback] = useState<{
+    type: "success" | "error" | "info";
+    title: string;
+    message: string;
+  } | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProposals();
@@ -19,7 +37,7 @@ export function Proposals() {
   const fetchProposals = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/proposals");
+      const res = await fetch("/api/proposals", { credentials: "same-origin" });
       const data = await res.json();
       setProposals(data);
     } catch (err) {
@@ -29,8 +47,64 @@ export function Proposals() {
     }
   };
 
+  const handleUpdateStatus = async (id: string, newStatus: "Approved" | "Rejected") => {
+    setProcessingId(id);
+    setActionFeedback(null);
+
+    try {
+      const res = await fetch(`/api/proposals/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ 
+          status: newStatus,
+          remarks: `Statutory review completed by ${user?.name || "Officer"} (${role})`
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 200) {
+        setActionFeedback({
+          type: "success",
+          title: `Proposal ${newStatus} Successfully`,
+          message: data.message || `Proposal ${id} marked as ${newStatus} with authenticated role: ${role}.`,
+        });
+        await fetchProposals();
+      } else if (res.status === 403) {
+        setActionFeedback({
+          type: "error",
+          title: "403 Forbidden (RBAC Backend Enforced)",
+          message: data.message || `Role '${role}' is not authorized to approve proposals. Only District and State authorities possess statutory sanction power.`,
+        });
+      } else if (res.status === 401) {
+        setActionFeedback({
+          type: "error",
+          title: "401 Unauthorized",
+          message: "Your session has expired. Please select a role to sign in.",
+        });
+      } else {
+        setActionFeedback({
+          type: "error",
+          title: "Request Error",
+          message: data.error || "Failed to update proposal status.",
+        });
+      }
+    } catch (err) {
+      setActionFeedback({
+        type: "error",
+        title: "Network Error",
+        message: "Unable to reach server to update proposal status.",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setActionFeedback(null);
+
     const formData = new FormData(e.currentTarget);
     const data = {
       projectName: formData.get("projectName"),
@@ -42,15 +116,43 @@ export function Proposals() {
     };
 
     try {
-      await fetch("/api/proposals", {
+      const res = await fetch("/api/proposals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify(data),
       });
-      await fetchProposals();
-      setView("list");
+
+      const resData = await res.json();
+
+      if (res.ok) {
+        setActionFeedback({
+          type: "success",
+          title: "Proposal Submitted",
+          message: `Project proposal submitted under ${data.ministry} by ${user?.name || role}.`,
+        });
+        await fetchProposals();
+        setView("list");
+      } else if (res.status === 403) {
+        setActionFeedback({
+          type: "error",
+          title: "403 Forbidden (RBAC Backend Enforced)",
+          message: resData.message || `Role '${role}' is not authorized to submit proposals. Only PIA/Agency, State, and National roles can submit proposals.`,
+        });
+      } else {
+        setActionFeedback({
+          type: "error",
+          title: "Submission Failed",
+          message: resData.error || "Could not submit proposal.",
+        });
+      }
     } catch (err) {
       console.error("Failed to submit proposal", err);
+      setActionFeedback({
+        type: "error",
+        title: "Network Error",
+        message: "Failed to submit proposal. Check server connectivity.",
+      });
     }
   };
 
@@ -97,7 +199,7 @@ export function Proposals() {
       <div className="p-8 max-w-4xl mx-auto w-full">
         <button 
           onClick={() => setView("list")}
-          className="flex items-center gap-2 text-sm text-graticule-teal hover:text-registry-ink mb-6 transition-colors"
+          className="flex items-center gap-2 text-sm text-graticule-teal hover:text-registry-ink mb-6 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Proposals
         </button>
@@ -106,6 +208,9 @@ export function Proposals() {
           <div className="border-b border-graticule-teal/30 pb-4 mb-6">
             <h2 className="text-2xl font-serif font-semibold text-registry-ink">Submit New Project Proposal</h2>
             <p className="text-registry-ink/60 text-sm mt-1">Initiate a new land acquisition workflow under RFCTLARR Act, 2013.</p>
+            <div className="mt-2 text-xs font-mono text-tilled-earth">
+              Submitting as: <strong>{user?.name}</strong> ({role})
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -183,13 +288,13 @@ export function Proposals() {
               <button 
                 type="button"
                 onClick={() => setView("list")}
-                className="px-6 py-2 text-registry-ink border border-graticule-teal/30 hover:bg-graticule-teal/10 transition-colors"
+                className="px-6 py-2 text-registry-ink border border-graticule-teal/30 hover:bg-graticule-teal/10 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button 
                 type="submit"
-                className="px-6 py-2 bg-tilled-earth text-white font-medium hover:bg-tilled-earth/90 transition-colors"
+                className="px-6 py-2 bg-tilled-earth text-white font-medium hover:bg-tilled-earth/90 transition-colors cursor-pointer"
               >
                 Submit for Scrutiny
               </button>
@@ -201,20 +306,89 @@ export function Proposals() {
   }
 
   return (
-    <div className="p-8 w-full">
-      <div className="flex justify-between items-end mb-8">
+    <div className="p-6 md:p-8 w-full max-w-7xl mx-auto">
+      {/* Header with Title and New Proposal Button */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6">
         <div>
           <h2 className="text-3xl font-serif font-semibold text-registry-ink">Project Proposals</h2>
-          <p className="text-registry-ink/60 mt-1">Track and manage land acquisition proposals across all ministries.</p>
+          <p className="text-registry-ink/60 mt-1">Track and manage land acquisition proposals across all ministries under RFCTLARR Act.</p>
         </div>
         <button 
           onClick={() => setView("create")}
-          className="flex items-center gap-2 px-4 py-2 bg-registry-ink text-white font-medium hover:bg-registry-ink/90 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-registry-ink text-white font-medium hover:bg-registry-ink/90 transition-colors shadow-sm cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" /> New Proposal
         </button>
       </div>
 
+      {/* Role Authority Indicator Bar */}
+      <div className="mb-6 p-3.5 bg-white border border-graticule-teal/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+        <div className="flex items-center gap-2.5">
+          {canApproveProposal ? (
+            <div className="p-1 rounded-sm bg-cultivated-green/10 text-cultivated-green border border-cultivated-green/30">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          ) : (
+            <div className="p-1 rounded-sm bg-amber-500/10 text-amber-700 border border-amber-500/30">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+          )}
+          <div>
+            <span className="font-semibold text-registry-ink">Current Role Authority ({role}): </span>
+            {canApproveProposal ? (
+              <span className="text-cultivated-green font-medium">
+                Authorized to grant statutory proposal approvals (District / State sanction power).
+              </span>
+            ) : (
+              <span className="text-registry-ink/70">
+                Statutory approval is reserved for <strong className="text-registry-ink">District & State</strong> authorities. Attempting approval will be rejected with HTTP 403 Forbidden by Express backend.
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="text-graticule-teal font-mono shrink-0">
+          User: <span className="text-registry-ink font-semibold">{user?.name}</span>
+        </div>
+      </div>
+
+      {/* Action Feedback Toast / Banner */}
+      <AnimatePresence>
+        {actionFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`mb-6 p-4 border flex items-start justify-between gap-3 ${
+              actionFeedback.type === "success"
+                ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                : actionFeedback.type === "error"
+                ? "bg-red-50 border-red-300 text-red-900"
+                : "bg-blue-50 border-blue-300 text-blue-900"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {actionFeedback.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-cultivated-green shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-alluvium-red shrink-0 mt-0.5" />
+              )}
+              <div>
+                <h4 className="font-semibold text-sm">{actionFeedback.title}</h4>
+                <p className="text-xs mt-0.5 opacity-90">{actionFeedback.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActionFeedback(null)}
+              className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Proposals Table */}
       <div className="bg-white border border-graticule-teal/30 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
@@ -227,18 +401,19 @@ export function Proposals() {
                 <th className="px-6 py-4">Area (Ha)</th>
                 <th className="px-6 py-4">Delay Risk</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-center">Statutory Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-graticule-teal/20">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-graticule-teal animate-pulse">
-                    Loading proposals...
+                  <td colSpan={8} className="px-6 py-12 text-center text-graticule-teal animate-pulse">
+                    Loading proposals from secure registry...
                   </td>
                 </tr>
               ) : proposals.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-registry-ink/60">
+                  <td colSpan={8} className="px-6 py-12 text-center text-registry-ink/60">
                     No proposals found. Create the first one to begin.
                   </td>
                 </tr>
@@ -256,7 +431,7 @@ export function Proposals() {
                     }}
                   >
                     <td className="px-6 py-4 font-mono text-xs text-graticule-teal">{proposal.id}</td>
-                    <td className="px-6 py-4 font-medium text-registry-ink max-w-[250px] truncate" title={proposal.projectName}>
+                    <td className="px-6 py-4 font-medium text-registry-ink max-w-[230px] truncate" title={proposal.projectName}>
                       {proposal.projectName}
                     </td>
                     <td className="px-6 py-4 text-registry-ink/80">{proposal.ministry}</td>
@@ -294,6 +469,70 @@ export function Proposals() {
                           {proposal.status}
                         </span>
                       </div>
+                    </td>
+
+                    {/* Statutory Role-Protected Actions */}
+                    <td className="px-6 py-4 text-center">
+                      {proposal.status === "Approved" ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-cultivated-green font-mono bg-cultivated-green/10 px-2.5 py-1 rounded-sm border border-cultivated-green/20">
+                          <Check className="w-3 h-3" /> Sanctioned
+                        </span>
+                      ) : proposal.status === "Rejected" ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-alluvium-red font-mono bg-alluvium-red/10 px-2.5 py-1 rounded-sm border border-alluvium-red/20">
+                          <X className="w-3 h-3" /> Rejected
+                        </span>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            disabled={processingId === proposal.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateStatus(proposal.id, "Approved");
+                            }}
+                            title={
+                              canApproveProposal
+                                ? `Approve proposal as ${role}`
+                                : `Role '${role}' cannot approve proposals. Click to test 403 Forbidden protection.`
+                            }
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-sm transition-all cursor-pointer ${
+                              canApproveProposal
+                                ? "bg-cultivated-green hover:bg-cultivated-green/90 text-white shadow-xs"
+                                : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{processingId === proposal.id ? "..." : "Approve"}</span>
+                            {!canApproveProposal && (
+                              <span className="text-[9px] font-mono bg-gray-200 px-1 py-0.2 rounded text-gray-600">
+                                403 Test
+                              </span>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={processingId === proposal.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateStatus(proposal.id, "Rejected");
+                            }}
+                            title={
+                              canApproveProposal
+                                ? `Reject proposal as ${role}`
+                                : `Role '${role}' cannot reject proposals. Click to test 403 Forbidden protection.`
+                            }
+                            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-sm transition-all cursor-pointer ${
+                              canApproveProposal
+                                ? "border border-alluvium-red/40 text-alluvium-red hover:bg-alluvium-red/10"
+                                : "text-gray-400 hover:text-gray-600 border border-gray-200"
+                            }`}
+                          >
+                            <X className="w-3 h-3" />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </motion.tr>
                 ))

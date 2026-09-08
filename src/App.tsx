@@ -12,9 +12,28 @@ import { Compensation } from "./components/Compensation";
 import { RnR } from "./components/RnR";
 import { Documents } from "./components/Documents";
 import { AlertsPanel } from "./components/Alerts";
+import { Login } from "./components/Login";
+import { useAuth } from "./context/AuthContext";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-survey-paper flex flex-col items-center justify-center font-sans">
+        <div className="h-12 w-12 bg-registry-ink text-survey-paper flex items-center justify-center font-serif font-bold text-2xl rounded-sm shadow-md animate-pulse mb-4">
+          B
+        </div>
+        <div className="font-serif font-semibold text-lg text-registry-ink">BhoomiSetu</div>
+        <div className="text-xs font-mono text-graticule-teal mt-1">Connecting to Secure Session...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   return (
     <div className="min-h-screen bg-survey-paper text-registry-ink flex flex-col font-sans">

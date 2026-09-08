@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Proposal, ProposalAction, StatusHistoryEntry, UserRole } from "../types";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle, FileText, X, Building2, MapPin, Ruler, Calendar, ShieldCheck, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -9,10 +9,15 @@ const actionToStatus: Record<ProposalAction, Proposal["status"]> = {
   "Submit for Scrutiny": "Under Scrutiny",
 };
 
-const roleActions: Record<UserRole, ProposalAction[]> = {
-  national: ["Approve", "Reject"],
-  state: ["Submit for Scrutiny"],
-  district: ["Submit for Scrutiny"],
+const roleActions: Record<string, ProposalAction[]> = {
+  "District": ["Approve", "Reject"],
+  "State": ["Approve", "Reject"],
+  "National": ["Submit for Scrutiny"],
+  "LAO Officer": [],
+  "PIA/Agency": ["Submit for Scrutiny"],
+  district: ["Approve", "Reject"],
+  state: ["Approve", "Reject"],
+  national: ["Submit for Scrutiny"],
   lao: [],
   agency: ["Submit for Scrutiny"],
 };
@@ -49,7 +54,7 @@ function getStatusIcon(status: string, className: string) {
 
 interface ProposalDetailProps {
   proposal: Proposal;
-  role: UserRole;
+  role: string;
   onBack: () => void;
   onStatusChange: (id: string, action: ProposalAction, comment: string) => Promise<void>;
 }
@@ -303,7 +308,7 @@ export function ProposalDetail({ proposal, role, onBack, onStatusChange }: Propo
   );
 }
 
-function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className="text-graticule-teal mt-0.5 shrink-0">{icon}</div>

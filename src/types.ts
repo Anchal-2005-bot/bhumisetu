@@ -1,3 +1,13 @@
+export type Role = 'National' | 'State' | 'District' | 'LAO Officer' | 'PIA/Agency';
+
+export interface AuthUser {
+  role: Role;
+  name: string;
+  designation: string;
+  jurisdiction: string;
+  department: string;
+}
+
 export interface KPI {
   areaNotified: string;
   areaAcquired: string;
