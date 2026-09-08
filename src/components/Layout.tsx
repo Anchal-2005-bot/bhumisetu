@@ -1,6 +1,9 @@
 import { Map as MapIcon, FileText, ClipboardCheck, HandCoins, Home, FileBarChart, ShieldAlert, Bell, User, LayoutDashboard, Database, FolderOpen } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import type { UserRole } from "../types";
 
 export function Sidebar({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (tab: string) => void }) {
+  const { roleLabel } = useAuth();
   const tabs = [
     { id: "dashboard", label: "National Dashboard", icon: LayoutDashboard },
     { id: "proposals", label: "Proposals", icon: FileText },
@@ -33,14 +36,15 @@ export function Sidebar({ activeTab, setActiveTab }: { activeTab: string, setAct
       </nav>
       <div className="p-4 border-t border-white/10">
         <div className="text-xs text-white/40 mb-2 font-mono uppercase tracking-wider">Session Info</div>
-        <div className="text-sm font-medium text-white">District LAO</div>
-        <div className="text-xs text-white/60">New Delhi, NCT</div>
+        <div className="text-sm font-medium text-white">{roleLabel}</div>
+        <div className="text-xs text-white/60">Active Session</div>
       </div>
     </aside>
   );
 }
 
 export function TopNav({ setActiveTab }: { setActiveTab?: (tab: string) => void }) {
+  const { role, setRole } = useAuth();
   return (
     <header className="h-16 border-b border-graticule-teal/30 bg-survey-paper flex items-center justify-between px-6 shrink-0">
       <div className="flex items-center gap-3">
@@ -68,6 +72,18 @@ export function TopNav({ setActiveTab }: { setActiveTab?: (tab: string) => void 
         </div>
 
         <div className="flex items-center gap-4 border-l border-graticule-teal/30 pl-6">
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+            className="text-xs border border-graticule-teal/30 bg-white px-2 py-1.5 text-registry-ink font-medium outline-none hover:border-tilled-earth transition-colors"
+            title="Switch role for testing"
+          >
+            <option value="national">National Admin</option>
+            <option value="state">State Coordinator</option>
+            <option value="district">District Collector</option>
+            <option value="lao">LAO</option>
+            <option value="agency">PIA Agency</option>
+          </select>
           <button className="text-graticule-teal hover:text-registry-ink text-sm font-medium">
             EN <span className="text-graticule-teal/50">/ HI</span>
           </button>

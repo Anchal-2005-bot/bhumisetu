@@ -21,6 +21,18 @@ export interface RiskProfile {
   factors: string[];
 }
 
+export type UserRole = "national" | "state" | "district" | "lao" | "agency";
+
+export type ProposalAction = "Approve" | "Reject" | "Submit for Scrutiny";
+
+export interface StatusHistoryEntry {
+  status: Proposal["status"];
+  timestamp: string;
+  actor: string;
+  role: UserRole;
+  comment: string;
+}
+
 export interface Proposal {
   id: string;
   projectName: string;
@@ -32,6 +44,7 @@ export interface Proposal {
   dateSubmitted: string;
   areaRequired: number;
   riskProfile?: RiskProfile;
+  statusHistory?: StatusHistoryEntry[];
 }
 
 export interface Alert {

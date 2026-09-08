@@ -13,7 +13,23 @@ async function startServer() {
 
   // Mock API Routes for BhoomiSetu
 
-  let mockProposals = [
+  const validTransitions: Record<string, string[]> = {
+    "Draft": ["Submitted"],
+    "Submitted": ["Under Scrutiny", "Rejected"],
+    "Under Scrutiny": ["Approved", "Rejected"],
+    "Approved": [],
+    "Rejected": [],
+  };
+
+  const roleAllowedActions: Record<string, string[]> = {
+    national: ["Approve", "Reject"],
+    state: ["Submit for Scrutiny"],
+    district: ["Submit for Scrutiny"],
+    lao: [],
+    agency: ["Submit for Scrutiny"],
+  };
+
+  let mockProposals: any[] = [
     {
       id: "PRJ-2026-001",
       projectName: "Delhi-Mumbai Expressway (Phase 4)",
@@ -28,7 +44,12 @@ async function startServer() {
         level: "Low",
         score: 12,
         factors: ["Favorable historical state timeline", "Low objection count (12)"]
-      }
+      },
+      statusHistory: [
+        { status: "Submitted", timestamp: "2025-11-12T09:00:00Z", actor: "PIA Rep (MoRTH)", role: "agency", comment: "Initial proposal submitted." },
+        { status: "Under Scrutiny", timestamp: "2025-11-15T14:30:00Z", actor: "State Coordinator", role: "state", comment: "Forwarded for SIA review." },
+        { status: "Approved", timestamp: "2025-12-01T11:00:00Z", actor: "Joint Secretary", role: "national", comment: "Cleared all RFCTLARR compliance checks." },
+      ]
     },
     {
       id: "PRJ-2026-002",
@@ -44,7 +65,11 @@ async function startServer() {
         level: "High",
         score: 84,
         factors: ["High historical district delay rate (68%)", "Urban density delays", "High objection volume (450+)"]
-      }
+      },
+      statusHistory: [
+        { status: "Submitted", timestamp: "2026-01-05T10:00:00Z", actor: "PIA Rep (Railways)", role: "agency", comment: "Initial proposal submitted." },
+        { status: "Under Scrutiny", timestamp: "2026-01-08T16:00:00Z", actor: "State Coordinator", role: "state", comment: "SIA report under evaluation." },
+      ]
     },
     {
       id: "PRJ-2026-003",
@@ -60,7 +85,11 @@ async function startServer() {
         level: "Medium",
         score: 45,
         factors: ["Approaching Sec 19 Declaration SLA", "Moderate objection count (142)"]
-      }
+      },
+      statusHistory: [
+        { status: "Submitted", timestamp: "2025-08-20T08:30:00Z", actor: "PIA Rep (DPIIT)", role: "agency", comment: "Initial proposal submitted." },
+        { status: "Under Scrutiny", timestamp: "2025-08-25T13:00:00Z", actor: "State Coordinator", role: "state", comment: "Awaiting SIA clearance." },
+      ]
     }
   ];
 
@@ -69,19 +98,69 @@ async function startServer() {
   });
 
   app.post("/api/proposals", (req, res) => {
+    const id = `PRJ-2026-00${mockProposals.length + 1}`;
+    const now = new Date().toISOString();
     const newProposal = {
       ...req.body,
-      id: `PRJ-2026-00${mockProposals.length + 1}`,
+      id,
       status: "Submitted",
-      dateSubmitted: new Date().toISOString().split('T')[0],
+      dateSubmitted: now.split('T')[0],
       riskProfile: {
         level: "Medium",
         score: 50,
         factors: ["Insufficient historical data for accurate prediction", "Standard SLA applies"]
-      }
+      },
+      statusHistory: [
+        { status: "Submitted", timestamp: now, actor: "PIA Rep", role: "agency", comment: "Initial proposal submitted." }
+      ]
     };
     mockProposals.unshift(newProposal);
     res.json(newProposal);
+  });
+
+  app.patch("/api/proposals/:id/status", (req, res) => {
+    const { id } = req.params;
+    const { action, role, comment } = req.body;
+
+    const proposal = mockProposals.find((p) => p.id === id);
+    if (!proposal) {
+      return res.status(404).json({ error: "Proposal not found" });
+    }
+
+    const actionToStatus: Record<string, string> = {
+      "Approve": "Approved",
+      "Reject": "Rejected",
+      "Submit for Scrutiny": "Under Scrutiny",
+    };
+
+    const newStatus = actionToStatus[action];
+    if (!newStatus) {
+      return res.status(400).json({ error: `Unknown action: ${action}` });
+    }
+
+    const allowed = validTransitions[proposal.status] || [];
+    if (!allowed.includes(newStatus)) {
+      return res.status(409).json({
+        error: `Cannot transition from "${proposal.status}" to "${newStatus}". Valid transitions: ${allowed.join(", ") || "none"}`,
+      });
+    }
+
+    const allowedActions = roleAllowedActions[role] || [];
+    if (!allowedActions.includes(action)) {
+      return res.status(403).json({ error: `Role "${role}" is not permitted to perform action "${action}".` });
+    }
+
+    proposal.status = newStatus;
+    proposal.statusHistory = proposal.statusHistory || [];
+    proposal.statusHistory.push({
+      status: newStatus,
+      timestamp: new Date().toISOString(),
+      actor: role === "national" ? "Joint Secretary" : role === "state" ? "State Coordinator" : "PIA Rep",
+      role,
+      comment: comment || `Status changed to ${newStatus}.`,
+    });
+
+    res.json(proposal);
   });
 
   app.get("/api/alerts", (req, res) => {

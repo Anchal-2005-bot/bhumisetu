@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
-import { Proposal } from "../types";
+import { Proposal, ProposalAction } from "../types";
+import { useAuth } from "../context/AuthContext";
+import { ProposalDetail } from "./ProposalDetail";
 import { Plus, ArrowLeft, Clock, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { motion } from "motion/react";
 
 export function Proposals() {
+  const { role } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [view, setView] = useState<"list" | "create">("list");
+  const [view, setView] = useState<"list" | "create" | "detail">("list");
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +54,21 @@ export function Proposals() {
     }
   };
 
+  const handleStatusChange = async (id: string, action: ProposalAction, comment: string) => {
+    const res = await fetch(`/api/proposals/${id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, role, comment }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to ${action} (HTTP ${res.status})`);
+    }
+    const updated: Proposal = await res.json();
+    setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    setSelectedProposal(updated);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "Approved": return <CheckCircle2 className="w-4 h-4 text-cultivated-green" />;
@@ -58,6 +77,20 @@ export function Proposals() {
       default: return <FileText className="w-4 h-4 text-graticule-teal" />;
     }
   };
+
+  if (view === "detail" && selectedProposal) {
+    return (
+      <ProposalDetail
+        proposal={selectedProposal}
+        role={role}
+        onBack={() => {
+          setView("list");
+          setSelectedProposal(null);
+        }}
+        onStatusChange={handleStatusChange}
+      />
+    );
+  }
 
   if (view === "create") {
     return (
@@ -217,6 +250,10 @@ export function Proposals() {
                     transition={{ delay: i * 0.05 }}
                     key={proposal.id} 
                     className="hover:bg-graticule-teal/5 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSelectedProposal(proposal);
+                      setView("detail");
+                    }}
                   >
                     <td className="px-6 py-4 font-mono text-xs text-graticule-teal">{proposal.id}</td>
                     <td className="px-6 py-4 font-medium text-registry-ink max-w-[250px] truncate" title={proposal.projectName}>
